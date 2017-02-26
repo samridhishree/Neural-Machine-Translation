@@ -9,7 +9,7 @@ import nltk
 from operator import itemgetter
 
 dyparams = dy.DynetParams()
-dyparams.set_mem(3800)
+dyparams.set_mem(11000)
 dyparams.init()
 
 #Vocabulary related parameters
@@ -50,7 +50,7 @@ def read(fname, pad_eos=True):
 
 german_train_file = sys.argv[1]
 english_train_file = sys.argv[2]
-model_file = ""
+model_file = sys.argv[3]
 
 #Get the training sentences as a list
 german_train = list(read(german_train_file))
@@ -89,18 +89,22 @@ for (german_list, english_list) in training_sentences:
 
 #Declare and define the enc-doc models
 model = dy.Model()
-enc_fwd_lstm = dy.LSTMBuilder(lstm_num_of_layers, embeddings_size, state_size, model)
-enc_bwd_lstm = dy.LSTMBuilder(lstm_num_of_layers, embeddings_size, state_size, model)
-dec_lstm = dy.LSTMBuilder(lstm_num_of_layers, ((state_size * 2) + embeddings_size), state_size, model)
-
-#Define the model parameters
-input_lookup = model.add_lookup_parameters((german_vocab_size, embeddings_size))
-attention_w1 = model.add_parameters(((attention_size, (state_size * 2))))
-attention_w2 = model.add_parameters(((attention_size, (state_size * lstm_num_of_layers * 2))))
-attention_v = model.add_parameters((1, attention_size))
-decoder_w = model.add_parameters((english_vocab_size, state_size + (state_size * 2)))
-decoder_b = model.add_parameters((english_vocab_size))
-output_lookup = model.add_lookup_parameters((english_vocab_size, embeddings_size))
+if(model_file == ""):
+    enc_fwd_lstm = dy.LSTMBuilder(lstm_num_of_layers, embeddings_size, state_size, model)
+    enc_bwd_lstm = dy.LSTMBuilder(lstm_num_of_layers, embeddings_size, state_size, model)
+    dec_lstm = dy.LSTMBuilder(lstm_num_of_layers, ((state_size * 2) + embeddings_size), state_size, model)
+    #Define the model parameters
+    input_lookup = model.add_lookup_parameters((german_vocab_size, embeddings_size))
+    attention_w1 = model.add_parameters(((attention_size, (state_size * 2))))
+    attention_w2 = model.add_parameters(((attention_size, (state_size * lstm_num_of_layers * 2))))
+    attention_v = model.add_parameters((1, attention_size))
+    decoder_w = model.add_parameters((english_vocab_size, state_size + (state_size * 2)))
+    decoder_b = model.add_parameters((english_vocab_size))
+    output_lookup = model.add_lookup_parameters((english_vocab_size, embeddings_size))
+else:
+    print "Loading Model."
+    [enc_fwd_lstm, enc_bwd_lstm, dec_lstm, input_lookup, output_lookup, attention_w1, attention_w2, attention_v, decoder_w, decoder_b] = model.load(model_file)
+    print "Model Loaded."
 
 #Convert the input(german) sentence into its embedded form
 def embed_sentence(sentence):
@@ -247,14 +251,14 @@ def train(model, training_sentences, num_epochs):
 				trans = generate(input_sentence, enc_fwd_lstm, enc_bwd_lstm, dec_lstm)
 				print trans
 				to_write = "{ Epoch Number : " + str(i) + " Sample : " + str(num_samples) + " loss_value : " + str(loss_value) + " output : " + str(trans) + " }"
-				f = open("translations_big_model.txt", "a")
+				f = open("translations_big_no_batch.txt", "a")
 				f.write(to_write + "\n")
 				f.close()
-			if num_samples % 10000 == 0:
-				model_filename = "model_big_size/model_epoch_" + str(i) + "_sample_" + str(num_samples)
+			if num_samples % 96000 == 0:
+				model_filename = "model_big_no_batch/model_epoch_" + str(i) + "_sample_" + str(num_samples)
 				model.save(model_filename, [enc_fwd_lstm, enc_bwd_lstm, dec_lstm, input_lookup, output_lookup, attention_w1, attention_w2, attention_v, decoder_w, decoder_b])
 
-train(model, indexed_train, 15)
+train(model, indexed_train, 20)
 
 
 
